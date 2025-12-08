@@ -5,6 +5,8 @@ VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPHeartbeatService", "UDPHeartbeatService\UDPHeartbeatService.csproj", "{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPHeartbeatService.Infrastructure", "UDPHeartbeatService.Infrastructure\UDPHeartbeatService.Infrastructure.csproj", "{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
