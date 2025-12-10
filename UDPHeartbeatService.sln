@@ -3,9 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPHeartbeatService", "UDPHeartbeatService\UDPHeartbeatService.csproj", "{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UDPHeartbeatService.Infrastructure", "UDPHeartbeatService.Infrastructure\UDPHeartbeatService.Infrastructure.csproj", "{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPHeartbeatService.Infrastructure", "UDPHeartbeatService.Infrastructure\UDPHeartbeatService.Infrastructure.csproj", "{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UDPHeartbeatService.Server", "UDPHeartbeatService.Server\UDPHeartbeatService.Server.csproj", "{FF26557D-CFAD-4E17-8225-E5290E94110D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UDPHeartbeatService.Client", "UDPHeartbeatService.Client\UDPHeartbeatService.Client.csproj", "{88818FAB-4C61-4E4A-B235-5D102FDD35B4}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UDPHeartbeatService.UnitTest", "UDPHeartbeatService.UnitTest\UDPHeartbeatService.UnitTest.csproj", "{C8B0B477-9119-4E62-AE0F-A8ECA74F455E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,14 +17,22 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3C83EFC8-09F0-4A6F-857C-B6904FAFD016}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BBAB5E76-AF28-4182-B6E4-914E401F9EC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF26557D-CFAD-4E17-8225-E5290E94110D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF26557D-CFAD-4E17-8225-E5290E94110D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF26557D-CFAD-4E17-8225-E5290E94110D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF26557D-CFAD-4E17-8225-E5290E94110D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88818FAB-4C61-4E4A-B235-5D102FDD35B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88818FAB-4C61-4E4A-B235-5D102FDD35B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88818FAB-4C61-4E4A-B235-5D102FDD35B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88818FAB-4C61-4E4A-B235-5D102FDD35B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8B0B477-9119-4E62-AE0F-A8ECA74F455E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8B0B477-9119-4E62-AE0F-A8ECA74F455E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8B0B477-9119-4E62-AE0F-A8ECA74F455E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8B0B477-9119-4E62-AE0F-A8ECA74F455E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

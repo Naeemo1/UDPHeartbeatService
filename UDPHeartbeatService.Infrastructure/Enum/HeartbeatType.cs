@@ -11,6 +11,7 @@ namespace UDPHeartbeatService.Infrastructure.Enum
 		Ping = 1,
 		Pong = 2,
 		Join = 3,
-		Leave = 4
+		Leave = 4,
+		Health = 5
 	}
 }

@@ -3,6 +3,7 @@
   "profiles": {
     "UDPHeartbeatService": {
       "commandName": "Project",
+      "commandLineArgs": "1 127.0.0.1 5000",
       "dotnetRunMessages": true,
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
