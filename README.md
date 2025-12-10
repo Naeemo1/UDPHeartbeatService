@@ -3,6 +3,9 @@
 
 A lightweight, high-performance failure detection library using UDP-based heartbeat protocol for distributed .NET applications.
 
+dotnet run -- --nodeId=node-a --port=5001 --peers=localhost:5002,localhost:5003
+dotnet run -- --nodeId=node-b --port=5002 --peers=localhost:5001,localhost:5003
+dotnet run -- --nodeId=node-c --port=5003 --peers=localhost:5001,localhost:5002
 ---
 
 ## Overview
