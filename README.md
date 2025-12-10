@@ -1,29 +1,42 @@
 # UDP Heartbeat Protocol for .NET
 
+[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A lightweight, high-performance failure detection library using UDP-based heartbeat protocol for distributed .NET applications.
+A lightweight, high-performance failure detection system using UDP-based heartbeat protocol for distributed .NET applications. This implementation separates the Server and Client into distinct components for flexible deployment.
 
-dotnet run -- --nodeId=node-a --port=5001 --peers=localhost:5002,localhost:5003
-dotnet run -- --nodeId=node-b --port=5002 --peers=localhost:5001,localhost:5003
-dotnet run -- --nodeId=node-c --port=5003 --peers=localhost:5001,localhost:5002
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Components](#components)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [How to Run](#how-to-run)
+- [Events](#events)
+- [Message Types](#message-types)
+- [Node States](#node-states)
+- [Failure Detection Flow](#failure-detection-flow)
+- [Use Cases](#use-cases)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+
 ---
 
 ## Overview
 
-The UDP Heartbeat Protocol provides fast and reliable failure detection for distributed systems. Nodes periodically exchange small UDP packets (heartbeats) to monitor each other's health. When a node stops responding, it's detected and marked as failed within seconds.
+The UDP Heartbeat Protocol provides fast and reliable failure detection for distributed systems. It consists of two main components:
 
----
+| Component | Role |
+|-----------|------|
+| **Server** | Central hub that receives heartbeats, tracks node health, and detects failures |
+| **Client** | Sends periodic heartbeats to the server and reports health metrics |
 
-## Why UDP Instead of TCP?
-
-| Aspect | UDP | TCP |
-|--------|-----|-----|
-| **Connection Overhead** | None (connectionless) | Requires connection setup/teardown |
-| **Speed** | Immediate send | 3-way handshake required |
-| **Memory Usage** | Minimal | Maintains connection state per peer |
-| **Scalability** | Handles thousands of nodes | Limited by connection count |
-| **Failure Detection** | Immediate timeout awareness | Waits for TCP timeout (can be slow) |
-| **Reliability** | Must handle packet loss | Guaranteed delivery |
+Nodes (clients) periodically send small UDP packets (heartbeats) to the server. When a node stops responding, the server detects the failure and raises appropriate events.
 
 ---
 
@@ -31,48 +44,320 @@ The UDP Heartbeat Protocol provides fast and reliable failure detection for dist
 
 | Feature | Description |
 |---------|-------------|
+| **Separated Architecture** | Server and Client are independent components |
 | **Fast Detection** | Sub-second to few-second failure detection |
-| **Lightweight** | Minimal CPU and memory footprint |
+| **Lightweight** | Minimal CPU and memory footprint using UDP |
+| **Event-Driven** | Subscribe to node lifecycle events (joined, left, died, revived) |
+| **Health Reporting** | Clients can send custom health metrics |
+| **Graceful Shutdown** | Clients send LEAVE message before disconnecting |
 | **Auto-Recovery** | Automatically detects when failed nodes come back online |
-| **Health Monitoring** | Real-time tracking of all node statuses |
-| **Thread-Safe** | Fully concurrent, safe for multi-threaded applications |
-| **Event-Driven** | Subscribe to node failure and recovery events |
+| **Thread-Safe** | All components are safe for concurrent access |
 | **Configurable** | Tune detection speed vs. accuracy trade-offs |
 
 ---
 
-## How It Works
-
-### Heartbeat Flow
+## Architecture
 
 ```
-  Node A                                           Node B
-    │                                                │
-    │ ─────────── PING (seq: 1) ──────────────────▶  │
-    │ ◀────────── PONG (seq: 1) ───────────────────  │
-    │                                                │
-    │ ─────────── PING (seq: 2) ──────────────────▶  │
-    │ ◀────────── PONG (seq: 2) ───────────────────  │
-    │                                                │
-    │ ─────────── PING (seq: 3) ──────────────────▶  │
-    │              ✗ No Response                     │  ← Node B fails
-    │                                                │
-    │ ─────────── PING (seq: 4) ──────────────────▶  │
-    │              ✗ No Response                     │
-    │                                                │
-    ▼                                                │
- [SUSPECTED]  ← After 2 missed heartbeats            │
-    │                                                │
-    │ ─────────── PING (seq: 5) ──────────────────▶  │
-    │              ✗ No Response                     │
-    ▼                                                │
- [DEAD]  ← After 3 missed heartbeats                 │
-    │                                                │
-    ▼                                                │
- NodeDied event triggered                            │
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│                         HEARTBEAT SERVER                            │
+│                         (Port 5000)                                 │
+│                                                                     │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐             │
+│   │   Receive   │    │    Node     │    │   Health    │             │
+│   │   Messages  │───▶│  Registry   │◀───│   Checker   │             │
+│   └─────────────┘    └─────────────┘    └─────────────┘             │
+│          │                  │                  │                    │
+│          │                  ▼                  │                    │
+│          │         ┌─────────────┐             │                    │
+│          └────────▶│   Events    │◀────────────┘                    │
+│                    └─────────────┘                                  │
+│                          │                                          │
+│     ┌────────────────────┼────────────────────┐                     │
+│     ▼                    ▼                    ▼                     │
+│ NodeJoined          NodeDied            NodeRevived                 │
+│ NodeLeft            NodeSuspected                                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲                   ▲                   ▲
+         │                   │                   │
+    UDP PING             UDP PING             UDP PING
+         │                   │                   │
+         │                   │                   │
+┌────────┴───────┐  ┌────────┴───────┐  ┌────────┴───────┐
+│                │  │                │  │                │
+│   CLIENT 1     │  │   CLIENT 2     │  │   CLIENT 3     │
+│   (node-1)     │  │   (node-2)     │  │   (node-3)     │
+│                │  │                │  │                │
+└────────────────┘  └────────────────┘  └────────────────┘
 ```
 
-### Node State Machine
+---
+
+## Project Structure
+
+```
+UDPHeartbeatService/
+│
+├── UDPHeartbeatService.Infrastructure/                # Shared library
+│   │
+│   ├── Models/
+│   │   ├── HeartbeatMessage.cs       # Message structure for UDP packets
+│   │   └── NodeState.cs              # Node information and status
+│   │
+│   ├── Configuration/
+│   │   └── HeartbeatConfiguration.cs # Server and Client configurations
+│   │
+│   └── Registry/
+│       └── NodeRegistry.cs           # Thread-safe node storage
+│
+├── UDPHeartbeatService.Server/              # Server application
+│   │
+│   ├── HeartbeatServer.cs            # Main server logic
+│   └── Program.cs                    # Server entry point
+│
+├── UDPHeartbeatService.Client/              # Client application
+│   │
+│   ├── HeartbeatClient.cs            # Main client logic
+│   └── Program.cs                    # Client entry point
+│
+├── UDPHeartbeatService.sln           # Solution file
+├── README.md                         # This file
+
+```
+
+---
+
+## Components
+
+### UDPHeartbeatService.Infrastructure
+
+The shared library containing common models, configurations, and utilities used by both server and client.
+
+| Class | Description |
+|-------|-------------|
+| `HeartbeatMessage` | Defines the structure of UDP packets exchanged between server and clients |
+| `NodeState` | Represents the current state of a connected node |
+| `HeartbeatServerConfiguration` | Configuration options for the server |
+| `HeartbeatClientConfiguration` | Configuration options for clients |
+| `NodeRegistry` | Thread-safe dictionary for tracking connected nodes |
+
+### UDPHeartbeatService.Server
+
+The central server that listens for heartbeats and tracks node health.
+
+| Responsibility | Description |
+|----------------|-------------|
+| Listen for UDP messages | Receives heartbeats on configured port |
+| Track node registry | Maintains list of all connected nodes |
+| Detect failures | Identifies nodes that stop responding |
+| Raise events | Notifies subscribers of node state changes |
+| Send acknowledgments | Responds to client heartbeats with PONG |
+
+### UDPHeartbeatService.Client
+
+The client component that sends heartbeats to the server.
+
+| Responsibility | Description |
+|----------------|-------------|
+| Send heartbeats | Periodic PING messages to server |
+| Handle responses | Process PONG acknowledgments |
+| Report health | Send custom health metrics |
+| Graceful shutdown | Send LEAVE message before stopping |
+| Connection management | Track connection state |
+
+---
+
+## Installation
+
+### Prerequisites
+
+- .NET 8.0 SDK or later
+- Visual Studio 2022 / VS Code / Rider
+
+### Build Solution
+
+```
+dotnet build
+```
+
+
+---
+
+## Configuration
+
+### Server Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `ListenPort` | 5000 | UDP port to listen on |
+| `HeartbeatTimeout` | 3 seconds | Time before a heartbeat is considered missed |
+| `MaxMissedHeartbeats` | 3 | Missed heartbeats before marking node as dead |
+| `SuspectThreshold` | 2 | Missed heartbeats before marking node as suspected |
+| `HealthCheckInterval` | 1 second | Interval for checking node health |
+
+### Client Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `NodeId` | Auto-generated | Unique identifier for this client |
+| `ServerAddress` | 127.0.0.1 | Server IP address |
+| `ServerPort` | 5000 | Server UDP port |
+| `HeartbeatInterval` | 1 second | Interval between heartbeats |
+| `Metadata` | Empty | Custom key-value pairs sent with heartbeats |
+
+### Tuning Guide
+
+| Environment | Interval | Timeout | Max Missed | Detection Time |
+|-------------|----------|---------|------------|----------------|
+| Local/LAN | 500ms | 1.5s | 2 | ~3 seconds |
+| Data Center | 1s | 3s | 3 | ~9 seconds |
+| Cloud/Multi-AZ | 2s | 6s | 4 | ~24 seconds |
+| WAN/Cross-Region | 5s | 15s | 3 | ~45 seconds |
+
+---
+
+## How to Run
+
+### Step 1: Start the Server
+
+Open a terminal and navigate to the server project:
+
+```
+cd UDPHeartbeatService.Server
+dotnet run
+```
+
+Expected output:
+
+```
+=== Heartbeat Server Started ===
+Listening on port 5000
+Press Ctrl+C to stop
+```
+
+### Step 2: Start Client(s)
+
+Open additional terminal(s) for each client:
+
+**Client 1:**
+```
+cd UDPHeartbeatService.Client
+dotnet run -- client-1 127.0.0.1 5000
+```
+
+**Client 2:**
+```
+cd UDPHeartbeatService.Client
+dotnet run -- client-2 127.0.0.1 5000
+```
+
+**Client 3:**
+```
+cd UDPHeartbeatService.Client
+dotnet run -- client-3 127.0.0.1 5000
+```
+
+### Command Line Arguments (Client)
+
+| Argument | Position | Description | Example |
+|----------|----------|-------------|---------|
+| NodeId | 1 | Unique client identifier | client-1 |
+| ServerAddress | 2 | Server IP address | 127.0.0.1 |
+| ServerPort | 3 | Server UDP port | 5000 |
+
+### Step 3: Test Failure Detection
+
+1. Start the server
+2. Start 2-3 clients
+3. Observe server showing connected nodes
+4. Kill one client (Ctrl+C or close terminal)
+5. Watch server detect the failure and raise events
+
+### Expected Server Output
+
+```
+=== Heartbeat Server Started ===
+Listening on port 5000
+Press Ctrl+C to stop
+
+[+] Node JOINED: client-1 (127.0.0.1:54321) - Alive
+[+] Node JOINED: client-2 (127.0.0.1:54322) - Alive
+
+=== Connected Nodes: 2 ===
+  client-1 (127.0.0.1:54321) - Alive - Last seen: 0.5s ago
+  client-2 (127.0.0.1:54322) - Alive - Last seen: 0.3s ago
+
+[?] Node SUSPECTED: client-2 (127.0.0.1:54322)
+[X] Node DEAD: client-2 (127.0.0.1:54322)
+
+=== Connected Nodes: 1 ===
+  client-1 (127.0.0.1:54321) - Alive - Last seen: 0.2s ago
+```
+
+### Expected Client Output
+
+```
+=== Heartbeat Client Started ===
+Node ID: client-1
+Server: 127.0.0.1:5000
+Press Ctrl+C to stop
+
+[✓] Connected to server!
+  <- PONG received (seq: 1)
+  <- PONG received (seq: 2)
+  -> Health update sent
+  <- PONG received (seq: 3)
+```
+
+---
+
+## Events
+
+### Server Events
+
+| Event | When Triggered | Use Case |
+|-------|----------------|----------|
+| `NodeJoined` | New client sends JOIN message | Add to load balancer, log connection |
+| `NodeLeft` | Client sends LEAVE message (graceful) | Remove from pool, no alert needed |
+| `NodeSuspected` | Client missed suspect threshold heartbeats | Reduce traffic, prepare failover |
+| `NodeDied` | Client missed max heartbeats | Trigger failover, send alert |
+| `NodeRevived` | Dead/suspected node starts responding | Add back to pool, clear alerts |
+
+### Client Events
+
+| Event | When Triggered | Use Case |
+|-------|----------------|----------|
+| `Connected` | First PONG received from server | Enable service, start processing |
+| `Disconnected` | LEAVE message sent | Cleanup, stop processing |
+| `PongReceived` | Server acknowledges heartbeat | Track latency, connection health |
+
+---
+
+## Message Types
+
+| Type | Direction | Description |
+|------|-----------|-------------|
+| `PING` | Client → Server | Regular heartbeat |
+| `PONG` | Server → Client | Heartbeat acknowledgment |
+| `JOIN` | Client → Server | Initial connection request |
+| `LEAVE` | Client → Server | Graceful disconnection |
+| `HEALTH` | Client → Server | Custom health metrics |
+
+### Message Structure
+
+| Field | Description |
+|-------|-------------|
+| Type | Message type (PING, PONG, JOIN, LEAVE, HEALTH) |
+| NodeId | Unique identifier of the sender |
+| SequenceNumber | Incrementing message counter |
+| Timestamp | Unix timestamp in milliseconds |
+| Metadata | Optional key-value pairs (health data, etc.) |
+
+---
+
+## Node States
 
 ```
                     heartbeat
@@ -98,125 +383,30 @@ The UDP Heartbeat Protocol provides fast and reliable failure detection for dist
                   └──────────┘
 ```
 
----
-
-## Message Types
-
-| Type | Direction | Purpose |
-|------|-----------|---------|
-| **PING** | Sender → Receiver | Request heartbeat response |
-| **PONG** | Receiver → Sender | Acknowledge heartbeat |
-| **JOIN** | New Node → Seed | Request to join cluster |
-| **LEAVE** | Departing Node → All | Graceful shutdown notification |
-
-### Message Structure
-
-| Field | Size | Description |
-|-------|------|-------------|
-| Type | 1 byte | Message type (PING, PONG, JOIN, LEAVE) |
-| NodeId | Variable | Unique identifier of sender |
-| Sequence Number | 8 bytes | Monotonically increasing counter |
-| Timestamp | 8 bytes | Unix timestamp in milliseconds |
-| Metadata | Variable | Optional key-value pairs |
+| State | Description |
+|-------|-------------|
+| `Unknown` | Initial state, no heartbeat received yet |
+| `Alive` | Node is responding normally |
+| `Suspected` | Node missed some heartbeats, may be failing |
+| `Dead` | Node is considered failed |
 
 ---
 
-## Configuration Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `NodeId` | Auto-generated | Unique identifier for this node |
-| `ListenPort` | 5000 | UDP port for heartbeat communication |
-| `HeartbeatInterval` | 1 second | Time between sending heartbeats |
-| `HeartbeatTimeout` | 3 seconds | Time before considering a heartbeat missed |
-| `MaxMissedHeartbeats` | 3 | Missed heartbeats before marking node as dead |
-| `SuspectThreshold` | 2 | Missed heartbeats before marking node as suspected |
-
----
-
-## Tuning Guide
-
-### Recommended Configurations
-
-| Environment | Interval | Timeout | Max Missed | Detection Time |
-|-------------|----------|---------|------------|----------------|
-| **Local/LAN** | 500ms | 1.5s | 2 | ~3 seconds |
-| **Data Center** | 1s | 3s | 3 | ~9 seconds |
-| **Cloud/Multi-AZ** | 2s | 6s | 4 | ~24 seconds |
-| **WAN/Cross-Region** | 5s | 15s | 3 | ~45 seconds |
-
-### Trade-offs
+## Failure Detection Flow
 
 ```
-FASTER DETECTION                          FEWER FALSE POSITIVES
-◀─────────────────────────────────────────────────────────────▶
+Timeline:
+────────────────────────────────────────────────────────────────────▶
 
-  Lower Interval          vs.          Higher Interval
-  Lower Timeout           vs.          Higher Timeout
-  Fewer Max Missed        vs.          More Max Missed
-  
-  + Quick failure detection            + Tolerates network blips
-  + Fast failover                      + Stable cluster membership
-  - More network traffic               - Slower failure detection
-  - More false positives               - Delayed failover
-```
-
----
-
-## Events
-
-| Event | When Triggered | Recommended Action |
-|-------|----------------|-------------------|
-| **NodeDied** | Node missed max heartbeats | Remove from load balancer, trigger failover |
-| **NodeSuspected** | Node missed suspect threshold | Reduce traffic, prepare for failover |
-| **NodeRevived** | Dead/suspected node responds | Add back to pool, resume normal traffic |
-
----
-
-## Architecture
-
-### Single Cluster
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     UDP Heartbeat Mesh                      │
-│                                                             │
-│         ┌──────────┐                  ┌──────────┐          │
-│         │  Node A  │◀────────────────▶│  Node B  │          │
-│         └────┬─────┘                  └─────┬────┘          │
-│              │                              │               │
-│              │         ┌──────────┐         │               │
-│              └────────▶│  Node C  │◀────────┘               │
-│                        └──────────┘                         │
-│                                                             │
-│   Every node sends heartbeats to every other node           │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### With Load Balancer Integration
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Client Requests                            │
-└───────────────────────────────┬──────────────────────────────────┘
-                                │
-                                ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                        Load Balancer                              │
-│                  (subscribes to heartbeat events)                 │
-└───────────────────────────────┬──────────────────────────────────┘
-                                │
-            ┌───────────────────┼───────────────────┐
-            │                   │                   │
-            ▼                   ▼                   ▼
-     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-     │  Service A  │     │  Service B  │     │  Service C  │
-     │   (ALIVE)   │     │   (ALIVE)   │     │   (DEAD)    │
-     └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-            │                   │                   │
-            └───────────────────┴───────────────────┘
-                                │
-                    UDP Heartbeat Protocol
+  │         │         │         │         │         │
+  HB        HB        HB       MISS      MISS      MISS
+  ✓         ✓         ✓         ✗         ✗         ✗
+  │         │         │         │         │         │
+ALIVE     ALIVE     ALIVE   SUSPECTED SUSPECTED   DEAD
+                               │         │         │
+                               ▼         │         ▼
+                          Event:     Event:    Event:
+                       NodeSuspected  (none)  NodeDied
 ```
 
 ---
@@ -226,86 +416,73 @@ FASTER DETECTION                          FEWER FALSE POSITIVES
 | Use Case | Description |
 |----------|-------------|
 | **Microservices** | Detect service failures for automatic failover |
-| **Distributed Cache** | Monitor cache nodes, redistribute on failure |
-| **Database Clusters** | Leader election, replica failover |
 | **Load Balancers** | Remove unhealthy backends automatically |
+| **Distributed Cache** | Monitor cache nodes, redistribute on failure |
+| **Database Clusters** | Support leader election and replica failover |
 | **Container Orchestration** | Monitor container health |
 | **Gaming Servers** | Detect player disconnections |
-
----
-
-## Comparison with Alternatives
-
-| Solution | Pros | Cons |
-|----------|------|------|
-| **UDP Heartbeat** | Fast, lightweight, simple | Must handle packet loss |
-| **TCP Keep-Alive** | Reliable | Slow timeout, connection overhead |
-| **HTTP Health Checks** | Rich status info | Higher latency, more overhead |
-| **Gossip Protocol** | Scalable to thousands | More complex, eventual consistency |
-| **Consensus (Raft/Paxos)** | Strong consistency | Higher latency, complex |
-
----
-
-## Performance
-
-### Benchmarks
-
-| Metric | Value |
-|--------|-------|
-| Heartbeat packet size | ~50-100 bytes |
-| Send latency | < 1 μs |
-| Memory per node | < 1 KB |
-| CPU overhead | Negligible |
-| Max nodes tested | 10,000+ |
-
-### Network Overhead
-
-| Nodes | Heartbeats/sec | Bandwidth |
-|-------|----------------|-----------|
-| 10 | 90 | ~9 KB/s |
-| 50 | 2,450 | ~245 KB/s |
-| 100 | 9,900 | ~990 KB/s |
-| 500 | 249,500 | ~25 MB/s |
-
-*Note: For large clusters (500+ nodes), consider gossip-based protocols to reduce overhead.*
+| **IoT Systems** | Monitor device connectivity |
 
 ---
 
 ## Best Practices
 
-1. **Choose appropriate timeouts** - Balance detection speed against false positives based on your network reliability
-
-2. **Use suspect state** - Don't immediately remove nodes; use the suspected state to reduce traffic first
-
-3. **Implement graceful shutdown** - Send LEAVE messages when shutting down to avoid unnecessary failure detection
-
-4. **Monitor heartbeat metrics** - Track missed heartbeats, latency, and false positive rates
-
-5. **Handle network partitions** - Consider what happens when the network splits; avoid split-brain scenarios
-
-6. **Test failure scenarios** - Regularly test node failures, network issues, and recovery
-
----
-
-## Limitations
-
-- **UDP packet loss** - In unreliable networks, may cause false positives
-- **No strong consistency** - Different nodes may have different views temporarily
-- **Firewall issues** - UDP may be blocked; ensure ports are open
-- **Large clusters** - O(n²) messages; use gossip for 500+ nodes
+| Practice | Description |
+|----------|-------------|
+| **Tune for your network** | Adjust timeouts based on network reliability |
+| **Use suspect state** | Don't immediately remove nodes; reduce traffic first |
+| **Implement graceful shutdown** | Always send LEAVE message when stopping |
+| **Monitor metrics** | Track missed heartbeats, latency, and false positives |
+| **Handle network partitions** | Consider split-brain scenarios |
+| **Test failure scenarios** | Regularly test node failures and recovery |
+| **Use meaningful NodeIds** | Use descriptive IDs for easier debugging |
+| **Send health metrics** | Include CPU, memory, and custom metrics in heartbeats |
 
 ---
 
-## Related Protocols
+## Troubleshooting
 
-- **SWIM** - Scalable Weakly-consistent Infection-style Membership
-- **Gossip** - Epidemic-style information dissemination
-- **Phi Accrual** - Adaptive failure detection
-- **Raft** - Consensus with leader election
+| Issue | Possible Cause | Solution |
+|-------|----------------|----------|
+| Client can't connect | Firewall blocking UDP | Open UDP port in firewall |
+| High false positives | Timeout too aggressive | Increase timeout and max missed |
+| Slow detection | Timeout too conservative | Decrease timeout values |
+| Memory growth | Node registry not cleaned | Ensure dead nodes are removed |
+| Duplicate nodes | NodeId collision | Use unique NodeIds |
+| Messages not received | Port already in use | Check if port is available |
+| Connection drops | Network instability | Increase timeout tolerance |
+
+### Diagnostic Commands
+
+Check if port is in use:
+```
+netstat -an | grep 5000
+```
+
+Test UDP connectivity:
+```
+nc -u -v 127.0.0.1 5000
+```
+
+Monitor network traffic:
+```
+tcpdump -i any udp port 5000
+```
+
+---
+
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| Heartbeat packet size | ~100-200 bytes |
+| Memory per node | < 1 KB |
+| CPU overhead | Negligible |
+| Network overhead per client | ~100 bytes/second |
 
 ---
 
 
 <p align="center">
-  Made with ❤️ for distributed systems
+  Made with ❤️ for distributed systems. Naeem Hisham
 </p>
